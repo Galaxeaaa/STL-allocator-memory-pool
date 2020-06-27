@@ -19,7 +19,7 @@ public:
         typedef MemPool<U> other;
     }
 
-    allocator() noexcept;
+    MemPool() noexcept;
     MemPool(const MemPool &other) noexcept;
     template <class U>
     MemPool(const MemPool<U> &other) noexcept;
