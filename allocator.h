@@ -6,10 +6,10 @@ class MemPool
 {
 public:
     typedef T value_type;
-    typedef T *pointer;
-    typedef const T *const_pointer;
-    typedef T &reference;
-    typedef const T &const_reference;
+    typedef value_type *pointer;
+    typedef const value_type *const_pointer;
+    typedef value_type &reference;
+    typedef const value_type &const_reference;
     typedef std::size_t size_type;
     typedef std::ptrdiff_t difference_type;
 
