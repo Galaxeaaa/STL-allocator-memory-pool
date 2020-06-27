@@ -1,6 +1,7 @@
 #pragma once
+#include <crtdefs.h>
 
-template <class T>
+template <class T, size_t BlockSize = 4096>
 class MemPool
 {
 public:
