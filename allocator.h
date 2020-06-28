@@ -1,8 +1,8 @@
 #pragma once
-#include <crtdefs.h>
+#include <cstddef>
 
 template <class T, size_t BlockSize = 4096>
-class MemPool
+class allocator
 {
 public:
     typedef T value_type;
@@ -16,15 +16,15 @@ public:
     template <class U>
     struct rebind
     {
-        typedef MemPool<U> other;
+        typedef allocator<U> other;
     }
 
-    MemPool() noexcept;
-    MemPool(const MemPool &other) noexcept;
+    allocator() noexcept;
+    allocator(const allocator &other) noexcept;
     template <class U>
-    MemPool(const MemPool<U> &other) noexcept;
+    allocator(const allocator<U> &other) noexcept;
 
-    ~MemPool();
+    ~allocator();
 
     pointer address(reference x) const;
     const_pointer address(const_reference x) const;
