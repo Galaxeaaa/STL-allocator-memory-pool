@@ -21,13 +21,13 @@ private:
     MemPool() {}
     // if any pool is empty, get new memory sapce
     void expPool(size_t blocksize);
-    // BLOCK DATA or FREELIST POINTER
-    union Block
+    // DATA or FREELIST POINTER
+    union Byte
     {
         char data;
-        Block *nextfree;
+        Byte *nextfree;
     };
 
 private:
-    static Block *pool[POOLNUM]; // 8, 16, 32, 64, 128 (Bytes)
+    static Byte *pool[POOLNUM]; // 8, 16, 32, 64, 128 (Bytes)
 };
