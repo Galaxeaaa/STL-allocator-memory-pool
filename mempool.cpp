@@ -1,7 +1,8 @@
 #include "mempool.h"
 #include <iostream>
 
-Block *MemPool::list[POOLNUM] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+Block *MemPool::list[POOLNUM] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+PoolHead *MemPool::curpool = nullptr;
 char *MemPool::start = nullptr;
 char *MemPool::end = nullptr;
 static int cnt_expPool = 0;
@@ -11,16 +12,14 @@ static int cnt_free = 0;
 
 void MemPool::clearPool()
 {
-    Block *p;
-    // for (int i = 0; i < POOLNUM; i++)
-    // {
-    //     p = list[i];
-    //     while (p != nullptr)
-    //     {
-    //         free(p);
-    //         p = p->next;
-    //     }
-    // }
+    PoolHead *p = curpool;
+    PoolHead *tmp;
+    while (p != nullptr)
+    {
+        tmp = p;
+        p = p->next;
+        delete (char *)tmp;
+    }
     std::cout << cnt_expPool << std::endl
               << cnt_refill << std::endl
               << cnt_alloc << std::endl
@@ -44,7 +43,16 @@ void MemPool::expPool()
         }
     }
     // get new pool
-    start = (char *)malloc(BASICPOOLSIZE * sizeof(char));
+    char *newpool = (char *)malloc(sizeof(PoolHead) + BASICPOOLSIZE * sizeof(char));
+    ((PoolHead *)newpool)->next = nullptr;
+    if (curpool == nullptr)
+        curpool = (PoolHead *)newpool;
+    else
+    {
+        curpool->next = (PoolHead *)newpool;
+        curpool = curpool->next;
+    }
+    start = newpool + sizeof(PoolHead);
     end = start + BASICPOOLSIZE;
 }
 
@@ -52,7 +60,7 @@ void MemPool::refill(size_t index)
 {
     cnt_refill++;
     size_t n = 16, bytes_left = end - start, bs = blocksize[index];
-    if (bytes_left == 0)
+    if (bytes_left < bs)
         expPool();
     else if (bytes_left < n * bs)
         n = bytes_left / bs;
@@ -62,8 +70,6 @@ void MemPool::refill(size_t index)
         list[index] = (Block *)start;
         start += bs;
     }
-    if (start == end)
-        expPool();
 }
 
 void *MemPool::mpAlloc(size_t size) noexcept

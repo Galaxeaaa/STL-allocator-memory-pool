@@ -14,8 +14,13 @@ const size_t blocksize[POOLNUM] = {16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 1
 union Block
 {
     union Block *next;
-    char *data;
+    char data[1];
 };
+
+typedef struct _PoolHead
+{
+    struct _PoolHead *next;
+} PoolHead;
 
 class MemPool
 {
@@ -28,7 +33,7 @@ public:
 private:
     // unused
     MemPool() {}
-    // if any pool is empty, get new memory sapce
+    // if current pool is empty, get new pool
     static void expPool();
     // find index of correct blocksize
     static size_t listIndex(size_t size);
@@ -38,6 +43,7 @@ private:
 
 private:
     static Block *list[POOLNUM]; // 8, 16, 32, 64, 128 (Bytes)
+    static PoolHead *curpool;
     static char *start;
     static char *end;
 };
