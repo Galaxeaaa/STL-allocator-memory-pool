@@ -1,76 +1,104 @@
 #include "mempool.h"
-#include "assert.h"
+#include <iostream>
 
-void MemPool::initPools()
+Block *MemPool::list[POOLNUM] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+char *MemPool::start = nullptr;
+char *MemPool::end = nullptr;
+static int cnt_expPool = 0;
+static int cnt_refill = 0;
+static int cnt_alloc = 0;
+static int cnt_free = 0;
+
+void MemPool::clearPool()
 {
-    int i = 0;
-    for (i = 0; i < POOLNUM; i++)
-    {
-        // get huge space from memory
-        pool[i] = new char[BASICPOOLSIZE + (sizeof(char *) + sizeof(unsigned char)) * BASICPOOLSIZE / blocksize[i]];
-        // init freelist for all pools
-        int j;
-        char **p1;
-        unsigned char *p2;
-        for (j = 0; j < BASICPOOLSIZE / blocksize[i] - 1; j++)
-        {
-            p1 = (char **)&pool[i][j * (blocksize[i] + sizeof(char *) + sizeof(unsigned char))];
-            *p1 = &pool[i][(j + 1) * (blocksize[i] + sizeof(char *) + sizeof(unsigned char))];
-            p2 = (unsigned char *)&pool[i][j * (blocksize[i] + sizeof(char *) + sizeof(unsigned char)) + sizeof(char *)];
-            *p2 = (unsigned char)i;
-        }
-        p1 = (char **)&pool[i][j * (blocksize[i] + sizeof(char *) + sizeof(unsigned char))];
-        *p1 = nullptr;
-    }
+    Block *p;
+    // for (int i = 0; i < POOLNUM; i++)
+    // {
+    //     p = list[i];
+    //     while (p != nullptr)
+    //     {
+    //         free(p);
+    //         p = p->next;
+    //     }
+    // }
+    std::cout << cnt_expPool << std::endl
+              << cnt_refill << std::endl
+              << cnt_alloc << std::endl
+              << cnt_free << std::endl;
 }
 
-void MemPool::expPool(size_t index)
+void MemPool::expPool()
 {
-    // get huge space from memory
-    pool[index] = new char[BASICPOOLSIZE + 9 * BASICPOOLSIZE / blocksize[index]];
-    // init freelist for all pools
-    int j;
-    char **p1;
-    unsigned char *p2;
-    for (j = 0; j < BASICPOOLSIZE / blocksize[index] - 1; j++)
+    cnt_expPool++;
+    // allocate rest bytes in pool to freelists
+    if (start != nullptr)
     {
-        p1 = (char **)&pool[index][j * (blocksize[index] + sizeof(char *) + sizeof(unsigned char))];
-        *p1 = &pool[index][(j + 1) * (blocksize[index] + sizeof(char *) + sizeof(unsigned char))];
-        p2 = (unsigned char *)&pool[index][j * (blocksize[index] + sizeof(char *) + sizeof(unsigned char)) + sizeof(char *)];
-        *p2 = (unsigned char)index;
+        size_t bytes_left = end - start;
+        while (bytes_left > 0)
+        {
+            size_t _li = listIndex(bytes_left) - 1;
+            (*(Block *)start).next = list[_li];
+            list[_li] = (Block *)start;
+            start += blocksize[_li];
+            bytes_left = end - start;
+        }
     }
-    p1 = (char **)&pool[index][j * (blocksize[index] + sizeof(char *) + sizeof(unsigned char))];
-    *p1 = nullptr;
-    p2 = (unsigned char *)&pool[index][j * (blocksize[index] + sizeof(char *) + sizeof(unsigned char)) + sizeof(char *)];
-    *p2 = (unsigned char)index;
+    // get new pool
+    start = (char *)malloc(BASICPOOLSIZE * sizeof(char));
+    end = start + BASICPOOLSIZE;
+}
+
+void MemPool::refill(size_t index)
+{
+    cnt_refill++;
+    size_t n = 16, bytes_left = end - start, bs = blocksize[index];
+    if (bytes_left == 0)
+        expPool();
+    else if (bytes_left < n * bs)
+        n = bytes_left / bs;
+    for (int i = 0; i < n; i++)
+    {
+        (*(Block *)start).next = list[index];
+        list[index] = (Block *)start;
+        start += bs;
+    }
+    if (start == end)
+        expPool();
 }
 
 void *MemPool::mpAlloc(size_t size) noexcept
 {
-    int i;
-    for (i = 0; i < POOLNUM; i++)
+    cnt_alloc++;
+    Block *p;
+    if (size > blocksize[POOLNUM - 1])
     {
-        if (blocksize[i] >= size)
-            break;
+        return malloc(size * sizeof(char));
     }
 
-    if (pool[i] == nullptr)
-        expPool(i);
+    int i = listIndex(size);
 
-    char *cp;
-    char **cpp;
-    cp = &pool[i][sizeof(char *) + sizeof(unsigned char)];
-    cpp = (char **)pool[i];
-    pool[i] = *cpp;
-    return cp;
+    if (list[i] == nullptr)
+        refill(i);
+
+    p = list[i];
+    list[i] = p->next;
+    return p;
 }
 
-void MemPool::mpFree(void *addr) noexcept
+void MemPool::mpFree(void *addr, size_t size) noexcept
 {
-    unsigned char *ucp = (unsigned char *)((char *)addr - sizeof(unsigned char));
-    char **cpp = (char **)((char *)addr - sizeof(unsigned char) - sizeof(char *));
-    int i = *ucp;
-    char *p = pool[i];
-    *cpp = p;
-    pool[i] = (char *)cpp;
+    cnt_free++;
+    if (size > MAXBLOCKSIZE)
+    {
+        free((char *)addr);
+        return;
+    }
+    size_t _li = listIndex(size);
+    (*(Block *)addr).next = list[_li];
+    list[_li] = (Block *)addr;
+}
+
+size_t MemPool::listIndex(size_t size)
+{
+    return (size + ALIGN - 1) / ALIGN - 1;
 }
