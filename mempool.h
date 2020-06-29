@@ -11,23 +11,18 @@ const size_t blocksize[POOLNUM] = {8, 16, 32, 64, 128};
 class MemPool
 {
 public:
-    // initialize all pools
-    void initPools();
     // memory pool allocation (if >128, just new)
-    void *mpAlloc(size_t size);
+    static void *mpAlloc(size_t size) noexcept;
+    static void mpFree(void *addr) noexcept;
 
 private:
     // unused
     MemPool() {}
+    // initialize all pools
+    void initPools();
     // if any pool is empty, get new memory sapce
-    void expPool(size_t blocksize);
-    // DATA or FREELIST POINTER
-    union Byte
-    {
-        char data;
-        Byte *nextfree;
-    };
+    static void expPool(size_t index);
 
 private:
-    static Byte *pool[POOLNUM]; // 8, 16, 32, 64, 128 (Bytes)
+    static char *pool[POOLNUM]; // 8, 16, 32, 64, 128 (Bytes)
 };
