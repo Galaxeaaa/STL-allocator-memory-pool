@@ -36,11 +36,11 @@ public:
     }
     
     pointer allocate(size_type n, const void *hint = 0){
-        return (pointer)MemPool::mpAlloc(sizeof(value_type)*n);
+        return reinterpret_cast<pointer>(MemPool::mpAlloc(sizeof(value_type)*n));
     }
 
     void deallocate(T *p, std::size_t n){
-        MemPool::mpFree((void*)p, n);
+        Mempool::mpFree((void*)p, sizeof(value_type)*n);
     }
 
     size_type max_size() const noexcept{
