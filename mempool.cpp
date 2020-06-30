@@ -1,14 +1,11 @@
 #include "mempool.h"
 #include <iostream>
 
-Block *MemPool::list[POOLNUM] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+// initialize static variables
+Block *MemPool::list[LISTNUM] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 PoolHead *MemPool::curpool = nullptr;
 char *MemPool::start = nullptr;
 char *MemPool::end = nullptr;
-static int cnt_expPool = 0;
-static int cnt_refill = 0;
-static int cnt_alloc = 0;
-static int cnt_free = 0;
 
 void MemPool::clearPool()
 {
@@ -20,15 +17,10 @@ void MemPool::clearPool()
         p = p->next;
         delete (char *)tmp;
     }
-    std::cout << cnt_expPool << std::endl
-              << cnt_refill << std::endl
-              << cnt_alloc << std::endl
-              << cnt_free << std::endl;
 }
 
 void MemPool::expPool()
 {
-    cnt_expPool++;
     // allocate rest bytes in pool to freelists
     if (start != nullptr)
     {
@@ -42,7 +34,7 @@ void MemPool::expPool()
             bytes_left = end - start;
         }
     }
-    // get new pool
+    // get new pool and link it to pool list
     char *newpool = (char *)malloc(sizeof(PoolHead) + BASICPOOLSIZE * sizeof(char));
     ((PoolHead *)newpool)->next = nullptr;
     if (curpool == nullptr)
@@ -52,18 +44,21 @@ void MemPool::expPool()
         curpool->next = (PoolHead *)newpool;
         curpool = curpool->next;
     }
+    // reset start and end
     start = newpool + sizeof(PoolHead);
     end = start + BASICPOOLSIZE;
 }
 
 void MemPool::refill(size_t index)
 {
-    cnt_refill++;
     size_t n = 16, bytes_left = end - start, bs = blocksize[index];
+    // if no even one block in pool, expand pool
     if (bytes_left < bs)
         expPool();
+    // else if there are less than n blocks in pool, reset n
     else if (bytes_left < n * bs)
         n = bytes_left / bs;
+    // get n blocks to refill list[index]
     for (int i = 0; i < n; i++)
     {
         (*(Block *)start).next = list[index];
@@ -74,33 +69,34 @@ void MemPool::refill(size_t index)
 
 void *MemPool::mpAlloc(size_t size) noexcept
 {
-    cnt_alloc++;
     Block *p;
-    if (size > blocksize[POOLNUM - 1])
+    // if requested size is too large, just call malloc
+    if (size > blocksize[LISTNUM - 1])
     {
         return malloc(size * sizeof(char));
     }
-
-    int i = listIndex(size);
-
-    if (list[i] == nullptr)
-        refill(i);
-
-    p = list[i];
-    list[i] = p->next;
+    // find correct list
+    int _li = listIndex(size);
+    // if list is empty, refill it
+    if (list[_li] == nullptr)
+        refill(_li);
+    // give first free block in list to the caller
+    p = list[_li];
+    list[_li] = p->next;
     return p;
 }
 
 void MemPool::mpFree(void *addr, size_t size) noexcept
 {
-    cnt_free++;
+    // if requested size is too large, just call free
     if (size > MAXBLOCKSIZE)
     {
         free((char *)addr);
         return;
     }
+    // link the block to the list of correct size
     size_t _li = listIndex(size);
-    (*(Block *)addr).next = list[_li];
+    ((Block *)addr)->next = list[_li];
     list[_li] = (Block *)addr;
 }
 
